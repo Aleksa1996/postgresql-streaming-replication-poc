@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+# ---------------------------------------------------------------------------- #
+#                                 Traefik                                      #
+# ---------------------------------------------------------------------------- #
+    traefik:
+        container_name: 'traefik'
+        image: 'traefik:v2.9.6'
+        volumes:
+            - '/var/run/docker.sock:/var/run/docker.sock:ro'
+        command:
+            - '--api.insecure=true'
+            - '--providers.docker=true'
+            - '--providers.docker.exposedbydefault=false'
+            - '--entrypoints.web.address=:80'
+        ports:
+            - '80:80'
+            - '443:443'
+            - '8080:8080'
+        restart: unless-stopped
+# ---------------------------------------------------------------------------- #
+#                                 PGPOOL                                       #
+# ---------------------------------------------------------------------------- #
+    pgpool:
+        container_name: 'pgpool'
+        image: 'dev-build/pgpool'
+        command: "pgpool -n"
+        build:
+            context: ./.docker/pgpool
+        volumes:
+            - './.docker/pgpool/conf:/etc/pgpool2'
+        restart: unless-stopped
+# ---------------------------------------------------------------------------- #
+#                                 DB                                           #
+# ---------------------------------------------------------------------------- #
+    db:
+        container_name: 'db'
+        image: 'postgres:16.1-bullseye'
+        volumes:
+            - './.docker/db/master/data:/var/lib/db/data'
+            # - './.docker/db/slave-1/data:/tmp/lib/db/data'
+        user: 1000:1000
+        ports:
+            - '5432:5432'
+        restart: unless-stopped
+        environment:
+            - POSTGRES_USER=root
+            - POSTGRES_PASSWORD=root
+            - POSTGRES_DB=db
+# ---------------------------------------------------------------------------- #
+#                                 DB                                           #
+# ---------------------------------------------------------------------------- #
+    slave-1:
+        container_name: 'slave-1'
+        image: 'postgres:16.1-bullseye'
+        volumes:
+            - './.docker/db/slave-1/data:/var/lib/db/data'
+        user: 1000:1000
+        restart: unless-stopped
+        environment:
+            - POSTGRES_USER=root
+            - POSTGRES_PASSWORD=root
+            - POSTGRES_DB=db
+# ---------------------------------------------------------------------------- #
+#                                 Adminer                                      #
+# ---------------------------------------------------------------------------- #
+    adminer:
+        container_name: 'adminer'
+        image: 'adminer:latest'
+        restart: unless-stopped
+        labels:
+            - 'traefik.enable=true'
+            - 'traefik.http.routers.adminer.entrypoints=web'
+            - 'traefik.http.routers.adminer.rule=Host(`adminer.local`)'
+            - 'traefik.http.routers.adminer.service=adminer'
+            - 'traefik.http.services.adminer.loadbalancer.server.port=8080'
+
+networks:
+    default:
+        ipam:
+            config:
+                - subnet: 172.177.0.0/16

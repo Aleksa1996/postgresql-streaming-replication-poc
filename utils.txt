@@ -1,0 +1,17 @@
+Fix permissions
+    1. Initialize postgres database only with ENV variables
+    2. Stop docker-compose
+    3. sudo chown user:user ./.docker/db/master/ -R
+    4. Start docker-compose with user: 1000:1000
+
+docker-compose down && docker-compose build --force-rm --no-cache && docker-compose up --force-recreate
+
+pg_basebackup -h db -U replicator --checkpoint=fast -D /var/lib/postgresql/data -R --slot=some_name -C
+
+# For replica
+pg_basebackup -h db -U replicator --checkpoint=fast -D /tmp/lib/db/data -R --slot=some_name -C
+
+CREATE USER replicator WITH password 'replicator' REPLICATION;
+
+# Clear slot
+select pg_drop_replication_slot('some_name');
